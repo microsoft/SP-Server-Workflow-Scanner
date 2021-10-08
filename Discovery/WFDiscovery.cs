@@ -79,9 +79,16 @@ namespace Discovery
                 Web web = cc.Web;
 
                 // Pre-load needed properties in a single call
+                /* old code AM 3/11
                 cc.Load(web, w => w.Id, w => w.ServerRelativeUrl, w => w.Url, w => w.WorkflowTemplates, w => w.WorkflowAssociations);                
                 cc.Load(web, p => p.ContentTypes.Include(ct => ct.WorkflowAssociations, ct => ct.Name, ct => ct.StringId));
                 cc.Load(web, p => p.Lists.Include(li => li.Id, li => li.Title, li => li.Hidden, li => li.DefaultViewUrl, li => li.BaseTemplate, li => li.RootFolder.ServerRelativeUrl, li => li.ItemCount, li => li.WorkflowAssociations));
+                */
+                cc.Load(web, w => w.Id, w => w.Language, w => w.ServerRelativeUrl, w => w.Url, w => w.WorkflowTemplates, w => w.WorkflowAssociations);
+                cc.Load(web, p => p.ContentTypes.Include(ct => ct.WorkflowAssociations, ct => ct.Name, ct => ct.StringId));
+                cc.Load(web, p => p.Lists.Include(li => li.Id, li => li.Title, li => li.Hidden, li => li.DefaultViewUrl, li => li.BaseTemplate, li => li.RootFolder.ServerRelativeUrl, li => li.ItemCount, li => li.WorkflowAssociations, li => li.ContentTypesEnabled, li => li.ContentTypes.Include(ct => ct.WorkflowAssociations, ct => ct.Name, ct => ct.StringId)));
+                cc.Load(cc.Site, p => p.RootWeb);
+                cc.Load(cc.Site.RootWeb, p => p.Lists.Include(li => li.Id, li => li.Title, li => li.Hidden, li => li.DefaultViewUrl, li => li.BaseTemplate, li => li.RootFolder.ServerRelativeUrl, li => li.ItemCount, li => li.WorkflowAssociations, li => li.ContentTypesEnabled, li => li.ContentTypes.Include(ct => ct.WorkflowAssociations, ct => ct.Name, ct => ct.StringId)));
                 /*
                 foreach (List list in web.Lists)
                 {
@@ -404,6 +411,16 @@ namespace Discovery
                     }
                 }
 
+                foreach (var list in lists.Where(p => p.ContentTypesEnabled))
+                {
+                    foreach (var listContentType in list.ContentTypes.Where(p => p.WorkflowAssociations.Count > 0))
+                    {
+                        foreach (var workflowAssociation in listContentType.WorkflowAssociations)
+                        {
+                            this.sp2010WorkflowAssociations.Add(new SP2010WorkFlowAssociation() { Scope = "ContentType", WorkflowAssociation = workflowAssociation, AssociatedContentType = listContentType, AssociatedList = list });
+                        }
+                    }
+                }
                 foreach (var ct in web.ContentTypes.Where(p => p.WorkflowAssociations.Count > 0))
                 {
                     foreach (var workflowAssociation in ct.WorkflowAssociations)
@@ -476,19 +493,12 @@ namespace Discovery
                                     UnsupportedActionCount = workFlowAnalysisResult != null ? workFlowAnalysisResult.UnsupportedAccountCount : 0,
                                     LastDefinitionEdit = loadedWorkflow != null ? loadedWorkflow.Item2 : associatedWorkflow.WorkflowAssociation.Modified,
                                     LastSubscriptionEdit = associatedWorkflow.WorkflowAssociation.Modified,
+                                    AssociationData = associatedWorkflow.WorkflowAssociation.AssociationData,
+                                    AllowManual = associatedWorkflow.WorkflowAssociation.AllowManual,
+                                    AutoStartChange = associatedWorkflow.WorkflowAssociation.AutoStartChange,
+                                    AutoStartCreate = associatedWorkflow.WorkflowAssociation.AutoStartCreate,
                                 };
                                 ops.AddRowToDataTable(workflowScanResult, dt, "2010", associatedWorkflow.Scope, workflowTemplate.Name, workflowTemplate.Id.ToString(), IsOOBWorkflow(workflowTemplate.Id.ToString()),web);
-                                //if (!this.ScanJob.WorkflowScanResults.TryAdd($"workflowScanResult.SiteURL.{Guid.NewGuid()}", workflowScanResult))
-                                //{
-                                //    ScanError error = new ScanError()
-                                //    {
-                                //        Error = $"Could not add 2010 {associatedWorkflow.Scope} type workflow scan result for {workflowScanResult.SiteColUrl}",
-                                //        SiteColUrl = this.SiteCollectionUrl,
-                                //        SiteURL = this.SiteUrl,
-                                //        Field1 = "WorkflowAnalyzer",
-                                //    };
-                                //    this.ScanJob.ScanErrors.Push(error);
-                                //}
                             }
                         }
                         else
@@ -531,6 +541,8 @@ namespace Discovery
                                     ActionCount = workFlowAnalysisResult != null ? workFlowAnalysisResult.ActionCount : 0,
                                     UsedTriggers = workFlowTriggerAnalysisResult?.WorkflowTriggers,
                                     LastDefinitionEdit = loadedWorkflow != null ? loadedWorkflow.Item2 : DateTime.MinValue,
+                                    AssociationData = "",
+
                                 };
                                 ops.AddRowToDataTable(workflowScanResult, dt, "2010", "", workflowTemplate.Name, workflowTemplate.Id.ToString(), IsOOBWorkflow(workflowTemplate.Id.ToString()),web);
                                 //if (!this.ScanJob.WorkflowScanResults.TryAdd($"workflowScanResult.SiteURL.{Guid.NewGuid()}", workflowScanResult))
@@ -598,7 +610,12 @@ namespace Discovery
                             UsedTriggers = workFlowTriggerAnalysisResult?.WorkflowTriggers,
                             LastSubscriptionEdit = associatedWorkflow.WorkflowAssociation.Modified,
                             LastDefinitionEdit = loadedWorkflow != null ? loadedWorkflow.Item2 : associatedWorkflow.WorkflowAssociation.Modified,
-                        };
+                            AssociationData = associatedWorkflow.WorkflowAssociation.AssociationData,
+                            AllowManual = associatedWorkflow.WorkflowAssociation.AllowManual,
+                            AutoStartChange = associatedWorkflow.WorkflowAssociation.AutoStartChange,
+                            AutoStartCreate = associatedWorkflow.WorkflowAssociation.AutoStartCreate,
+
+                    };
                         ops.AddRowToDataTable(workflowScanResult, dt, "2010", associatedWorkflow.Scope, associatedWorkflow.WorkflowAssociation.Name, Guid.Empty.ToString(), false,web);
                         //if (!this.ScanJob.WorkflowScanResults.TryAdd($"workflowScanResult.SiteURL.{Guid.NewGuid()}", workflowScanResult))
                         //{
@@ -676,7 +693,9 @@ namespace Discovery
             LoadWorkflowLibrary(cc);
             try
             {
-                return GetFileInformation(cc.Web, $"{this.workflowList.RootFolder.ServerRelativeUrl}/{workflowAssociation.Name}/{workflowAssociation.Name}.xoml");
+                  return GetFileInformation(cc.Web, $"{this.workflowList.RootFolder.ServerRelativeUrl}/{workflowAssociation.Name}/{workflowAssociation.Name}.xoml");
+                //  old code change to test  return GetFileInformation(cc.Web, $"/sites/complexsites/Workflows/{workflowAssociation.Name}/{workflowAssociation.Name}.xoml");
+
             }
             catch (Exception ex)
             {
@@ -694,7 +713,8 @@ namespace Discovery
                 LoadWorkflowLibrary(cc);
                 try
                 {
-                    return GetFileInformation(cc.Web, $"{this.workflowList.RootFolder.ServerRelativeUrl}/{workflowTemplate.Name}/{workflowTemplate.Name}.xoml");
+                   return GetFileInformation(cc.Web, $"{this.workflowList.RootFolder.ServerRelativeUrl}/{workflowTemplate.Name}/{workflowTemplate.Name}.xoml");
+                    // old code change to test     return GetFileInformation(cc.Web, $"/sites/complexsites/Workflows/{workflowTemplate.Name}/{workflowTemplate.Name}.xoml");
                 }
                 catch (Exception ex)
                 {
@@ -714,6 +734,7 @@ namespace Discovery
 
             var baseExpressions = new List<Expression<Func<List, object>>> { l => l.DefaultViewUrl, l => l.Id, l => l.BaseTemplate, l => l.OnQuickLaunch, l => l.DefaultViewUrl, l => l.Title, l => l.Hidden, l => l.RootFolder.ServerRelativeUrl };
             var query = cc.Web.Lists.IncludeWithDefaultProperties(baseExpressions.ToArray());
+          // ram code  var query = cc.Web.Lists; //.IncludeWithDefaultProperties(baseExpressions.ToArray());
             var lists = cc.Web.Context.LoadQuery(query.Where(l => l.Title == "Workflows"));
             cc.ExecuteQuery();
             this.workflowList = lists.FirstOrDefault();

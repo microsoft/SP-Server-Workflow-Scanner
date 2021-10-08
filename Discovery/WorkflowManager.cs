@@ -9,6 +9,9 @@ using Common;
 
 namespace Discovery
 {
+    /// <summary>
+    /// Class to handle workflow analysis
+    /// </summary>
     public sealed class WorkflowManager
     {
         private static readonly Lazy<WorkflowManager> _lazyInstance = new Lazy<WorkflowManager>(() => new WorkflowManager());
@@ -168,6 +171,7 @@ namespace Discovery
                 }
 
                 var namespacePrefix = string.Empty;
+                var namespacePrefix1 = string.Empty;
                 XmlNamespaceManager nameSpaceManager = null;
                 if (xmlDoc.FirstChild.Attributes != null)
                 {
@@ -182,6 +186,18 @@ namespace Discovery
 
                 // Grab all nodes with the workflow action namespace (ns0/local)
                 var nodes = xmlDoc.SelectNodes($"//{namespacePrefix}*", nameSpaceManager);
+                XmlNodeList ns1Nodes = null;
+                if (wfType == WorkflowTypes.SP2010)
+                {
+                    var xmlns = xmlDoc.FirstChild.Attributes["xmlns:ns1"];
+                    if (xmlns != null)
+                    {
+                        nameSpaceManager.AddNamespace("ns1", xmlns.Value);
+                        namespacePrefix1 = "ns1:";
+
+                        ns1Nodes = xmlDoc.SelectNodes($"//{namespacePrefix1}*", nameSpaceManager);
+                    }
+                }
 
                 // Iterate over the nodes and "identify the OOB activities"
                 List<string> usedOOBWorkflowActivities = new List<string>();
@@ -192,44 +208,15 @@ namespace Discovery
 
                 foreach (XmlNode node in nodes)
                 {
-                    actionCounter++;
+                    ParseXmlNode(wfType, usedOOBWorkflowActivities, unsupportedOOBWorkflowActivities, ref actionCounter, ref knownActionCounter, ref unsupportedActionCounter, node);
+                }
 
-                    WorkflowAction defaultOOBWorkflowAction = null;
 
-                    if (wfType == WorkflowTypes.SP2010)
+                if (wfType == WorkflowTypes.SP2010 && ns1Nodes != null && ns1Nodes.Count > 0)
+                {
+                    foreach (XmlNode node in ns1Nodes)
                     {
-                        defaultOOBWorkflowAction = this.defaultWorkflowActions.SP2010DefaultActions.Where(p => p.ActionNameShort == node.LocalName).FirstOrDefault();
-                    }
-                    else if (wfType == WorkflowTypes.SP2013)
-                    {
-                        defaultOOBWorkflowAction = this.defaultWorkflowActions.SP2013DefaultActions.Where(p => p.ActionNameShort == node.LocalName).FirstOrDefault();
-                    }
-
-                    if (defaultOOBWorkflowAction != null)
-                    {
-                        knownActionCounter++;
-                        if (!usedOOBWorkflowActivities.Contains(defaultOOBWorkflowAction.ActionNameShort))
-                        {
-                            usedOOBWorkflowActivities.Add(defaultOOBWorkflowAction.ActionNameShort);
-                        }
-
-
-                        if (wfType == WorkflowTypes.SP2010)
-                        {
-                            if (!WorkflowManager.SP2010SupportedFlowActions.Contains(defaultOOBWorkflowAction.ActionName))
-                            {
-                                unsupportedActionCounter++;
-                                unsupportedOOBWorkflowActivities.Add(defaultOOBWorkflowAction.ActionNameShort);
-                            }
-                        }
-                        else if (wfType == WorkflowTypes.SP2013)
-                        {
-                            if (!WorkflowManager.SP2013SupportedFlowActions.Contains(defaultOOBWorkflowAction.ActionName))
-                            {
-                                unsupportedActionCounter++;
-                                unsupportedOOBWorkflowActivities.Add(defaultOOBWorkflowAction.ActionNameShort);
-                            }
-                        }
+                        ParseXmlNode(wfType, usedOOBWorkflowActivities, unsupportedOOBWorkflowActivities, ref actionCounter, ref knownActionCounter, ref unsupportedActionCounter, node);
                     }
                 }
 
@@ -250,6 +237,49 @@ namespace Discovery
             return null;
         }
 
+        private void ParseXmlNode(WorkflowTypes wfType, List<string> usedOOBWorkflowActivities, List<string> unsupportedOOBWorkflowActivities, ref int actionCounter, ref int knownActionCounter, ref int unsupportedActionCounter, XmlNode node)
+        {
+            actionCounter++;
+
+            WorkflowAction defaultOOBWorkflowAction = null;
+
+            if (wfType == WorkflowTypes.SP2010)
+            {
+                defaultOOBWorkflowAction = this.defaultWorkflowActions.SP2010DefaultActions.Where(p => p.ActionNameShort == node.LocalName).FirstOrDefault();
+            }
+            else if (wfType == WorkflowTypes.SP2013)
+            {
+                defaultOOBWorkflowAction = this.defaultWorkflowActions.SP2013DefaultActions.Where(p => p.ActionNameShort == node.LocalName).FirstOrDefault();
+            }
+
+            if (defaultOOBWorkflowAction != null)
+            {
+                knownActionCounter++;
+                if (!usedOOBWorkflowActivities.Contains(defaultOOBWorkflowAction.ActionNameShort))
+                {
+                    usedOOBWorkflowActivities.Add(defaultOOBWorkflowAction.ActionNameShort);
+                }
+
+
+                if (wfType == WorkflowTypes.SP2010)
+                {
+                    if (!WorkflowManager.SP2010SupportedFlowActions.Contains(defaultOOBWorkflowAction.ActionName))
+                    {
+                        unsupportedActionCounter++;
+                        unsupportedOOBWorkflowActivities.Add(defaultOOBWorkflowAction.ActionNameShort);
+                    }
+                }
+                else if (wfType == WorkflowTypes.SP2013)
+                {
+                    if (!WorkflowManager.SP2013SupportedFlowActions.Contains(defaultOOBWorkflowAction.ActionName))
+                    {
+                        unsupportedActionCounter++;
+                        unsupportedOOBWorkflowActivities.Add(defaultOOBWorkflowAction.ActionNameShort);
+                    }
+                }
+            }
+        }
+
         /// <summary>
         /// Trigger the population of the default workflow actions for 2010/2013 workflows
         /// </summary>
@@ -260,7 +290,7 @@ namespace Discovery
             var sp2010Actions = LoadDefaultActions(WorkflowTypes.SP2010);
             var sp2013Actions = LoadDefaultActions(WorkflowTypes.SP2013);
 
-            foreach (var action in sp2010Actions)
+            foreach(var action in sp2010Actions)
             {
                 wfActions.SP2010DefaultActions.Add(new WorkflowAction() { ActionName = action, ActionNameShort = GetShortName(action) });
             }
@@ -287,32 +317,30 @@ namespace Discovery
         private List<string> LoadDefaultActions(WorkflowTypes wfType)
         {
             List<string> wfActionsList = new List<string>();
-            
+
             string fileName = null;
 
             if (wfType == WorkflowTypes.SP2010)
             {
-                //fileName = "SharePointPnP.Modernization.Scanner.Core.Workflow.sp2010wfmodel.xml";
-                fileName = "Common.sp2010wfmodel.xml";
+                //  fileName = "SharePointPnP.Modernization.Scanner.Core.Workflow.sp2010wfmodel.xml";
+                  fileName = "Common.sp2010wfmodel.xml";
             }
             else if (wfType == WorkflowTypes.SP2013)
             {
-                //fileName = "SharePointPnP.Modernization.Scanner.Core.Workflow.sp2013wfmodel.xml";
                 fileName = "Common.sp2013wfmodel.xml";
+                // fileName = "SharePointPnP.Modernization.Scanner.Core.Workflow.sp2013wfmodel.xml";
             }
 
             var wfModelString = "";
-
-            //using (Stream stream = typeof(WorkflowManager).Assembly.GetManifestResourceStream(fileName))
+            // using (Stream stream = typeof(WorkflowManager).Assembly.GetManifestResourceStream(fileName))
             using (Stream stream = typeof(WorkflowAction).Assembly.GetManifestResourceStream(fileName))
-            {
+            { 
                 using (StreamReader reader = new StreamReader(stream))
                 {
                     wfModelString = reader.ReadToEnd();
                 }
             }
-
-            if (!string.IsNullOrEmpty(wfModelString))
+        if (!string.IsNullOrEmpty(wfModelString))
             {
                 if (wfType == WorkflowTypes.SP2010)
                 {
@@ -323,7 +351,7 @@ namespace Discovery
                         wfInformation = (Common.SP2010.WorkflowInfo)xmlWorkflowInformation.Deserialize(stream);
                     }
 
-                    foreach (var wfAction in wfInformation.Actions.Action)
+                    foreach(var wfAction in wfInformation.Actions.Action)
                     {
                         if (!wfActionsList.Contains(wfAction.ClassName))
                         {
@@ -356,4 +384,3 @@ namespace Discovery
         #endregion
     }
 }
-

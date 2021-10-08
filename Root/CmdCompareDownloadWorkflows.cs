@@ -1,10 +1,6 @@
 ﻿using System;
-using System.Collections.Generic;
 using System.IO;
-using System.Linq;
 using System.Management.Automation;
-using System.Text;
-using System.Threading.Tasks;
 using Common;
 namespace Root
 {
@@ -48,8 +44,6 @@ namespace Root
             Host.UI.WriteLine(ConsoleColor.Cyan, Host.UI.RawUI.BackgroundColor, "Please standby. This may take some time.. ");
             Console.WriteLine(System.Environment.NewLine);
             Logging.GetInstance().WriteToLogFile(Logging.Info, "Beginning to analyze and compare SharePoint Workflows to Power Automate features.. ");
-            //CompareInfoPathForms cif = new CompareInfoPathForms();
-            //cif.CompareInfoPathToPowerApps(OutputDirectory);
             CompareWorkflows cwf = new CompareWorkflows();
             cwf.CompareWorkflowsToPowerAutomate(OutputDirectory);
         }

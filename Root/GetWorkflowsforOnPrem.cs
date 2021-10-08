@@ -3,14 +3,12 @@ using Discovery;
 using Microsoft.SharePoint;
 using Microsoft.SharePoint.Administration;
 using Microsoft.SharePoint.Client;
-using OfficeDevPnP.Core;
 using System;
-using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Data;
 using System.IO;
 using System.Management.Automation;
-using System.Security;
+using System.Net;
 
 namespace Root
 {
@@ -18,13 +16,12 @@ namespace Root
     {
         public string Url { get; set; }
         public string Scope { get; set; }
-        //public string useExistingSummaryFile { get; set; }
-        public string userName { get; set; }
-        public string password { get; set; }
+        public PSCredential Credential { get; set; }
         public bool OnPrem { get; set; }
         public string DownloadPath { get; set; }
         public bool DownloadForms { get; set; }
         public string DomainName { get; set; }
+
         public DirectoryInfo analysisFolder;
         public DirectoryInfo downloadedFormsFolder;
         public DirectoryInfo summaryFolder;
@@ -49,12 +46,16 @@ namespace Root
                 else if (Scope == "WebApplication")
                 {
                     siteCollectionsUrl = GetAllWebAppSites();
+
                 }
                 else if (Scope == "SiteCollection")
                 {
                     siteCollectionsUrl.Add(Url);
                 }
-                //FindWorkflows(siteCollectionsUrl, Credential);
+                else if (Scope == "SiteCollectionsUrls")
+                {
+                    siteCollectionsUrl = GetAllWebAppSitesFromUrl(Url);
+                }
                 FindWorkflows(siteCollectionsUrl);
 
                 Logging.GetInstance().WriteToLogFile(Logging.Info, "***********************************************************************");
@@ -71,6 +72,71 @@ namespace Root
             return dt;
         }
 
+
+        // used with list of site collections in CSV format
+        public List<string> GetAllWebAppSitesFromCSV()
+        {
+            List<string> webAppSiteCollectionUrls = new List<string>();
+            try
+            {
+                SPWebApplication objWebApp = null;
+                objWebApp = SPWebApplication.Lookup(new Uri(Url));
+                if (objWebApp == null)
+                {
+                    Console.ForegroundColor = ConsoleColor.DarkMagenta;
+                    Console.WriteLine("Unable to obtain the object for the Web Application URL provided. Check to make sure the URL provided is correct.");
+                    Console.ForegroundColor = ConsoleColor.White;
+                    Logging.GetInstance().WriteToLogFile(Logging.Error, "Unable to obtain the object for the Web Application URL provided. SPWebApplication.Lookup(new Uri(Url)) returned NULL");
+                }
+                else
+                {
+                    foreach (SPSite site in objWebApp.Sites)
+                    {
+                        webAppSiteCollectionUrls.Add(site.Url);
+                    }
+                }
+
+
+            }
+            catch (Exception ex)
+            {
+                Logging.GetInstance().WriteToLogFile(Logging.Error, ex.Message);
+                Logging.GetInstance().WriteToLogFile(Logging.Error, ex.StackTrace);
+            }
+            return webAppSiteCollectionUrls;
+        }
+
+
+
+
+
+        private List<string> GetAllWebAppSitesFromUrl(string filePath)
+        {
+            List<string> siteCollectionUrls = new List<string>();
+
+            try
+            {
+                string line;
+                System.IO.StreamReader file =
+                    new System.IO.StreamReader(filePath);
+                while ((line = file.ReadLine()) != null)
+                {
+                    //removes all extra spaces etc. 
+                    siteCollectionUrls.Add(line.TrimEnd());
+                    //System.Console.WriteLine(line);
+                }
+                file.Close();
+            }
+            catch (Exception ex)
+            {
+                Logging.GetInstance().WriteToLogFile(Logging.Error, ex.Message);
+                Logging.GetInstance().WriteToLogFile(Logging.Error, ex.StackTrace);
+            }
+
+
+            return siteCollectionUrls;
+
+        }
         public List<string> GetAllWebAppSites()
         {
             List<string> webAppSiteCollectionUrls = new List<string>();
@@ -137,9 +203,6 @@ namespace Root
                                                 try
                                                 {
                                                     farmSiteCollectionUrls.Add(site.Url);
-                                                    //Console.Write("Gathering InfoPath form locations for Content DB " + contentDatabase.Name + ".....");
-                                                    //QueryDatabases(contentDatabase.Name, contentDatabase.DatabaseConnectionString);
-                                                    // Console.WriteLine("Done !");
                                                 }
                                                 catch (Exception ex)
                                                 {
@@ -169,7 +232,6 @@ namespace Root
             }
             return farmSiteCollectionUrls;
         }
-        //public void FindWorkflows(List<string> sitecollectionUrls, PSCredential Credential)
         public void FindWorkflows(List<string> sitecollectionUrls)
         {
             try
@@ -177,8 +239,14 @@ namespace Root
                 foreach (string url in sitecollectionUrls)
                 {
                     ClientContext siteClientContext = null;
-                    //siteClientContext = CreateClientContext(url,Credential,DomainName);
-                    siteClientContext = CreateClientContext(url, userName,password, DomainName);
+                    if (Credential != null)
+                    {
+                        siteClientContext = CreateClientContext(url, Credential, DomainName);
+                    }
+                    else
+                    {
+                        siteClientContext = CreateClientContext(url);
+                    }
                     using (siteClientContext)
                     {
                         bool hasPermissions = false;
@@ -274,14 +342,12 @@ namespace Root
             }
         }
 
-        //internal ClientContext CreateClientContext(string url, string username, SecureString password, string domainName)
         internal ClientContext CreateClientContext(string url, PSCredential Credential, string domainName)
         {
-            ClientContext cc = null;
+            ClientContext cc = new ClientContext(url);
             try
             {
-                AuthenticationManager authManager = new AuthenticationManager();
-                cc = authManager.GetNetworkCredentialAuthenticatedContext(url, Credential.UserName, Credential.Password, domainName);
+                cc.Credentials = new NetworkCredential(Credential.UserName, Credential.Password, domainName);
                 Web web = cc.Web;
                 cc.Load(web, website => website.Title);
                 cc.ExecuteQuery();
@@ -297,13 +363,12 @@ namespace Root
             return cc;
         }
 
-        internal ClientContext CreateClientContext(string url, string userName, string password, string domainName)
+        internal ClientContext CreateClientContext(string url)
         {
-            ClientContext cc = null;
+            ClientContext cc = new ClientContext(url);
+            cc.Credentials = System.Net.CredentialCache.DefaultNetworkCredentials;
             try
             {
-                AuthenticationManager authManager = new AuthenticationManager();
-                cc = authManager.GetNetworkCredentialAuthenticatedContext(url, userName, password, domainName);
                 Web web = cc.Web;
                 cc.Load(web, website => website.Title);
                 cc.ExecuteQuery();
@@ -325,45 +390,36 @@ namespace Root
             {
                 dt.Columns.Add("SiteColID");
                 dt.Columns.Add("SiteURL");
-                dt.Columns.Add("CreatedBy");
-                dt.Columns.Add("ModifiedBy");
                 dt.Columns.Add("ListTitle");
                 dt.Columns.Add("ListUrl");
                 dt.Columns.Add("ContentTypeId");
                 dt.Columns.Add("ContentTypeName");
-                dt.Columns.Add("ItemCount");
                 dt.Columns.Add("Scope");
                 dt.Columns.Add("Version");
                 dt.Columns.Add("WFTemplateName");
+                dt.Columns.Add("WorkFlowName");
                 dt.Columns.Add("IsOOBWorkflow");
-                dt.Columns.Add("RelativePath");
                 dt.Columns.Add("WFID");
                 dt.Columns.Add("WebID");
                 dt.Columns.Add("WebURL");
-                //dt.Columns.Add("ListorLibID");
-                //dt.Columns.Add("RelativePath");
-                //dt.Columns.Add("IpTemplateName");
-                //dt.Columns.Add("InfoPathUsage");
-                //dt.Columns.Add("IpID");
+                dt.Columns.Add("Enabled");
+                dt.Columns.Add("HasSubscriptions");
+                dt.Columns.Add("ConsiderUpgradingToFlow");
+                dt.Columns.Add("ToFLowMappingPercentage");
+                dt.Columns.Add("UsedActions");
+                dt.Columns.Add("ActionCount");
+                dt.Columns.Add("AllowManual");
+                dt.Columns.Add("AutoStartChange");
+                dt.Columns.Add("AutoStartCreate");
+                dt.Columns.Add("LastDefinitionModifiedDate");
+                dt.Columns.Add("LastSubsrciptionModifiedDate");
+                dt.Columns.Add("AssociationData");
             }
             catch (Exception ex)
             {
                 Logging.GetInstance().WriteToLogFile(Logging.Error, ex.Message);
                 Logging.GetInstance().WriteToLogFile(Logging.Error, ex.StackTrace);
 
-            }
-        }
-
-        internal static void PopulateAdminAndOwnerColumns(ConcurrentDictionary<string, SiteScanResult> siteScanResults, ConcurrentDictionary<string, WorkflowScanResult> workflowScanResults)
-        {
-            foreach (var workflowScanResult in workflowScanResults)
-            {
-                if (siteScanResults.ContainsKey(workflowScanResult.Value.SiteColUrl))
-                {
-                    var siteScanResult = siteScanResults[workflowScanResult.Value.SiteColUrl];
-                    workflowScanResult.Value.Admins = siteScanResult.Admins;
-                    workflowScanResult.Value.Owners = siteScanResult.Owners;
-                }
             }
         }
     }

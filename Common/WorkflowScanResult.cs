@@ -1,9 +1,5 @@
-﻿using OfficeDevPnP.Core.Entities;
-using System;
+﻿using System;
 using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 
 namespace Common
 {
@@ -88,10 +84,15 @@ namespace Common
 
         public bool HasSubscriptions { get; set; }
 
+        public string AssociationData { get; set; }
         public int ActionCount { get; set; }
 
-        public List<string> UsedActions { get; set; }
-
+        public List<string> UsedActions
+        {
+            get; set;
+        }
+        // calculates Flow Mapping Percentage 
+        // item.Value.ToFLowMappingPercentage
         public int ToFLowMappingPercentage
         {
             get
@@ -116,15 +117,8 @@ namespace Common
         public DateTime LastSubscriptionEdit { get; set; }
 
         public DateTime LastDefinitionEdit { get; set; }
-
-        /// <summary>
-        /// Site administrators
-        /// </summary>
-        public List<UserEntity> Admins { get; set; }
-        /// <summary>
-        /// Site owners
-        /// </summary>
-        public List<UserEntity> Owners { get; set; }
-
+        public bool AllowManual { get; set; }
+        public bool AutoStartChange { get; set; }
+        public bool AutoStartCreate { get; set; }
     }
 }

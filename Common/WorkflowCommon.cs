@@ -62,16 +62,28 @@ namespace Common
                 dt.Columns.Add("ListUrl");
                 dt.Columns.Add("ContentTypeId");
                 dt.Columns.Add("ContentTypeName");
-                dt.Columns.Add("ItemCount");
                 dt.Columns.Add("Scope");
                 dt.Columns.Add("Version");
                 dt.Columns.Add("WFTemplateName");
+                dt.Columns.Add("WorkFlowName");
                 dt.Columns.Add("IsOOBWorkflow");
-                dt.Columns.Add("RelativePath");
+          //    dt.Columns.Add("RelativePath");
                 dt.Columns.Add("WFID");
                 dt.Columns.Add("WebID");
                 dt.Columns.Add("WebURL");
-
+                dt.Columns.Add("Enabled");
+                dt.Columns.Add("HasSubscriptions");
+                dt.Columns.Add("ConsiderUpgradingToFlow");
+                dt.Columns.Add("ToFLowMappingPercentage");
+                dt.Columns.Add("UsedActions");
+                dt.Columns.Add("ActionCount");
+                dt.Columns.Add("AllowManual");
+                dt.Columns.Add("AutoStartChange");
+                dt.Columns.Add("AutoStartCreate");
+                dt.Columns.Add("LastDefinitionModifiedDate");
+                dt.Columns.Add("LastSubsrciptionModifiedDate");
+                dt.Columns.Add("AssociationData");
+                //dt.Columns.Add("Complexity");
                 //dt.Columns.Add("ListorLibID");
                 //dt.Columns.Add("RelativePath");
                 //dt.Columns.Add("IpTemplateName");
@@ -101,24 +113,49 @@ namespace Common
                     dr["SiteColID"] = web.Id;
                 }
                 else
-                    dr["SiteURL"] = workflowScanResult.SiteColUrl;
+                dr["SiteURL"] = workflowScanResult.SiteColUrl;
                 //dr["WebURL"] = workflowScanResult.SiteURL;
-                dr["CreatedBy"] = workflowScanResult.CreatedBy;
-                dr["ModifiedBy"] = workflowScanResult.ModifiedBy;
+            //    dr["CreatedBy"] = workflowScanResult.CreatedBy;
+            //    dr["ModifiedBy"] = workflowScanResult.ModifiedBy;
                 dr["WebURL"] = web.Url;
                 dr["ListTitle"] = workflowScanResult.ListTitle;
                 dr["ListUrl"] = workflowScanResult.ListUrl;
                 dr["ContentTypeId"] = workflowScanResult.ContentTypeId;
                 dr["ContentTypeName"] = workflowScanResult.ContentTypeName;
-                dr["ItemCount"] = workflowScanResult.ActionCount;
                 dr["Scope"] = scope;
                 dr["Version"] = version;
                 dr["WFTemplateName"] = wfName;
+                dr["WorkFlowName"] = workflowScanResult.SubscriptionName;
                 dr["IsOOBWorkflow"] = IsOOBWF;
-                dr["ItemCount"] = workflowScanResult.ActionCount;
+                dr["Enabled"] = workflowScanResult.Enabled;   // adding for is enabled 
                 dr["WFID"] = wfID;
                 dr["WebID"] = web.Id;
+                dr["HasSubscriptions"] = workflowScanResult.HasSubscriptions;   // adding for subscriptions 
+                string sUsedActions = "";
+                // AM need to refactor into a helper function
+                if (workflowScanResult.UsedActions != null)
+                {
+                    foreach (var item in workflowScanResult.UsedActions)
+                    {
+                        sUsedActions = item.ToString()+";"+ sUsedActions;
+                    }
+                }
+                dr["ToFLowMappingPercentage"] = workflowScanResult.ToFLowMappingPercentage;   // adding for percentange upgradable to flow 
+                dr["ConsiderUpgradingToFlow"] = workflowScanResult.ConsiderUpgradingToFlow;   // adding for consider upgrading to flow 
+                dr["UsedActions"] = sUsedActions;   // adding for UsedActions
+                dr["ActionCount"] = workflowScanResult.ActionCount;   // adding for ActionCount
+                dr["AllowManual"] = workflowScanResult.AllowManual;
+                dr["AutoStartChange"] = workflowScanResult.AutoStartChange;
+                dr["AutoStartCreate"] = workflowScanResult.AutoStartCreate;
+                dr["LastDefinitionModifiedDate"] = workflowScanResult.LastDefinitionEdit;
+                dr["LastSubsrciptionModifiedDate"] = workflowScanResult.LastSubscriptionEdit;
+                dr["AssociationData"] = workflowScanResult.AssociationData;
+
+
+
+                //dr["Complexity"] = "High";   // adding placeholder for Complexity
                 dt.Rows.Add(dr);
+                
                 //dt.Columns.Add("SiteColID");
                 //dt.Columns.Add("SiteURL");
                 //dt.Columns.Add("ListTitle");

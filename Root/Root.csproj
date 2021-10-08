@@ -213,8 +213,6 @@
   <ItemGroup>
     <Compile Include="CmdCompareDownloadWorkflows.cs" />
     <Compile Include="CmdGetWorkflowAssociationsForOnprem.cs" />
-    <Compile Include="CmdGetWorkflowAssociationsForSPO.cs" />
-    <Compile Include="GetWorkflowForSPOnline.cs" />
     <Compile Include="GetWorkflowsforOnPrem.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
   </ItemGroup>

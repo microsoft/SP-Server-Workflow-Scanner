@@ -1,31 +1,13 @@
 ﻿using System;
 using System.IO;
 using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 using System.Data;
 using System.Management.Automation;
-using Microsoft.SharePoint.Client;
-using System.Security;
-using OfficeDevPnP.Core;
 using Common;
-using Discovery;
 
 
 namespace Root
 {
-    public class PwdDynamicParam
-    {
-        private SecureString pwd;
-
-        [Parameter(Mandatory = true, HelpMessage = "Specify the password as a secure string")]
-        public SecureString Password
-        {
-            get { return pwd; }
-            set { pwd = value; }
-        }
-    }
     /// <summary>
     /// Commandlet to discover the InfoPath forms in 
     /// Onpremise environments that are published to
@@ -35,7 +17,6 @@ namespace Root
     ///
 
     [Cmdlet(VerbsCommon.Get, "WorkflowAssociationsForOnprem")]
-    //public class CmdGetWorkflowAssociationsForOnprem : PSCmdlet,IDynamicParameters
     public class CmdGetWorkflowAssociationsForOnprem : PSCmdlet
     {
         private string assessmentScope;
@@ -44,12 +25,8 @@ namespace Root
         [Parameter(Mandatory = true, HelpMessage = "Specify the Domain name of the user account")]
         public string DomainName;
 
-        [Parameter(Mandatory = false, HelpMessage = "Specify the password (NOTE : This paramater takes password as plain text. If you like to provide the password as a secure string, ignore this parameter. Youw will be prompted to type in the password as a secure string")]
-        public string PasswordPlainText;
-
-        [Parameter(Mandatory = true, HelpMessage = "Specify the user account for authentication")]
-        public string UserAccount;
-
+        [Parameter(Mandatory = false, ParameterSetName = "Credential", HelpMessage = "Specify the user name and password ")]
+        public PSCredential Credential;
 
         [Parameter(Mandatory = false, HelpMessage = "Specify the file path of a text file containing target site collection URLs")]
         public string SiteCollectionURLFilePath;
@@ -70,23 +47,8 @@ namespace Root
         public string AssessmentOutputFolder;
         private string logFolderPath;
         public DirectoryInfo logFolder;
-        private PwdDynamicParam pwdDyn = null;
-        private bool pwdIsPlain = true;
+
         public DataTable dtWorkflowLocations = new DataTable();
-
-
-        public object GetDynamicParameters()
-        {
-            if (Object.Equals(PasswordPlainText, null))
-            {
-                pwdDyn = new PwdDynamicParam();
-                pwdIsPlain = false;
-                return pwdDyn;
-            }
-            else
-                return null;
-
-        }
         protected override void BeginProcessing()
         {
 
@@ -119,9 +81,19 @@ namespace Root
 
                 if (String.IsNullOrEmpty(WebApplicationUrl))
                 {
-                    if (String.IsNullOrEmpty(SiteCollectionUrl))
+                     if (!String.IsNullOrEmpty(SiteCollectionURLFilePath))
+                    {
+                        assessmentScope = "SiteCollectionsUrls";
+                        BeginToAssess();
+                    }
+                    else if (String.IsNullOrEmpty(SiteCollectionUrl))
                     {
                         assessmentScope = "Farm";
+                        BeginToAssess();
+                    }
+                    else if(!String.IsNullOrEmpty(SiteCollectionURLFilePath))
+                    {
+                        assessmentScope = "SiteCollectionsUrls";
                         BeginToAssess();
                     }
                     else
@@ -137,6 +109,7 @@ namespace Root
                         WriteWarning("Provide either the Web App URL or the Site Collection URL, but not both !");
 
                     }
+
                     else
                     {
                         assessmentScope = "WebApplication";
@@ -176,8 +149,6 @@ namespace Root
                 {
                     GetWorkflowsforOnPrem objonPrem = new GetWorkflowsforOnPrem();
                     ops.CreateDirectoryStructure(AssessmentOutputFolder);
-
-                    //Logging.GetInstance().WriteToLogFile(Logging.Info, "Beginning assessment..");
                     Console.WriteLine(System.Environment.NewLine);
                     Host.UI.WriteLine(ConsoleColor.Yellow, Host.UI.RawUI.BackgroundColor, "Beginning assessment..");
 
@@ -196,14 +167,23 @@ namespace Root
                         objonPrem.Scope = "SiteCollection";
                         objonPrem.Url = SiteCollectionUrl;
                     }
+                    else if (assessmentScope.Equals("SiteCollectionsUrls"))
+                    {
+                        objonPrem.Scope = "SiteCollectionsUrls";
+                        objonPrem.Url = SiteCollectionURLFilePath;
+
+                    }
                     objonPrem.DownloadPath = AssessmentOutputFolder;
-                    //Set UserName & Password
-                    objonPrem.userName = UserAccount;
-                    if (pwdIsPlain)
-                        objonPrem.password = PasswordPlainText;
+                    //Set Credentials from user entry 
+                    if (Credential != null)
+                    {
+                        objonPrem.Credential = Credential;
+                    } 
                     else
-                        objonPrem.password = pwdDyn.Password.ToString();
-                    //dtWorkflowLocations = objonPrem.Execute(Credential);
+                    { 
+                    }
+                    
+                    // run the workflow scan
                     dtWorkflowLocations = objonPrem.Execute();
                     //Save the CSV file
                     string csvFilePath = string.Concat(AssessmentOutputFolder, ops.summaryFolder, ops.summaryFile);
@@ -213,72 +193,12 @@ namespace Root
                 {
                     Host.UI.WriteLine(ConsoleColor.Cyan, Host.UI.RawUI.BackgroundColor, "Operation aborted as per your input !");
                 }              
-                //New Code Ends
-
-
-                //Create Assessment folders
-                /* old code commented out
-                ops.CreateDirectoryStructure(AssessmentOutputFolder);
-
-                ops.CreateDataTableColumns(dt);
-                string csvFilePath = string.Concat(AssessmentOutputFolder, ops.summaryFolder, ops.summaryFile);
-                string downloadXomlFolderPath = string.Concat(AssessmentOutputFolder, ops.downloadedFormsFolder);
-                sitecollectionUrls.Clear();
-                int scCount = LoopSiteCollectionUrls(sitecollectionUrls, SiteCollectionURLFilePath);
-                if (scCount == 0)
-                {
-                    WriteWarning(string.Format("The text file located at {0} does not contain Site Collection URLs and appears to be empty !", SiteCollectionURLFilePath));
-                }
-                else
-                {
-                    AuthenticationManager authManager = new AuthenticationManager();
-                    ClientContext cc = null;
-
-                    foreach (var scUrl in sitecollectionUrls)
-                    {
-                        if (pwdIsPlain)
-                            cc = authManager.GetNetworkCredentialAuthenticatedContext(scUrl, UserAccount, PasswordPlainText, DomainName);
-                        else
-                            cc = authManager.GetNetworkCredentialAuthenticatedContext(scUrl, UserAccount, pwdDyn.Password, DomainName);
-
-                        Web web = cc.Web;
-                        cc.Load(web, website => website.Title);
-                        cc.ExecuteQuery();
-
-                        Host.UI.WriteLine(ConsoleColor.DarkMagenta, Host.UI.RawUI.BackgroundColor, web.Title);
-                        WorkflowManager.Instance.LoadWorkflowDefaultActions();
-
-                        WorkflowDiscovery wfDisc = new WorkflowDiscovery();
-                        wfDisc.DiscoverWorkflows(cc, dt);
-                    }
-                    //Save the CSV file
-                    ops.WriteToCsvFile(dt, csvFilePath);
-                }
-                */
-
             }
             catch (Exception ex)
             {
                 Host.UI.WriteLine(ConsoleColor.DarkRed, Host.UI.RawUI.BackgroundColor, ex.Message);
             }
         }
-        private static SecureString GetPassword()
-        {
-            ConsoleKeyInfo info;
-            //Get the user's password as a SecureString    
-            SecureString securePassword = new SecureString();
-            do
-            {
-                info = Console.ReadKey(true);
-                if (info.Key != ConsoleKey.Enter)
-                {
-                    securePassword.AppendChar(info.KeyChar);
-                }
-            }
-            while (info.Key != ConsoleKey.Enter);
-            return securePassword;
-        }
-
         public int LoopSiteCollectionUrls(List<string> sitecollectionUrls, string filePath)
         {
             int counter = 0;
@@ -291,7 +211,6 @@ namespace Root
                 {
                     //removes all extra spaces etc. 
                     sitecollectionUrls.Add(line.TrimEnd());
-                    //System.Console.WriteLine(line);
                     counter++;
                 }
                 file.Close();                
