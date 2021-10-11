@@ -1,14 +1,20 @@
 # Project
-<Code will be available by 9/10>
-> This repo has been populated by an initial template to help get you started. Please
-> make sure to update the content to build a great experience for community-building.
+To Start - Clone Project locally. This project has been verified to work in Visual Studio 2019. Once project is open, restore NuGet packages and you should be able to build the solution. Common is the main project to build, but all the distributing DLLs are part of the Root solution (Root\bin\Release). If you need to distribute, you will need the following DLLs from Root\bin\Release:
+* Discovery.dll
+* Microsoft.Services.WorkfIowAssessment.Common.dll
+* Microsoft.Services.WorkfIowAssessment.Root.dll
+* Microsoft.SharePoint.CIient.dll
+* Microsoft.SharePoint.CIient.Runtime.dll
+* Microsoft. SharePoint.CIient.WorkfIowServices.dll
+* OfficeDevPnP.Core.dll
 
-As the maintainer of this project, please make a few updates:
+![image](https://user-images.githubusercontent.com/63272213/136854578-da4def7f-e22a-4541-ae74-f1d3dc328494.png)
 
-- Improving this README.MD file to provide a great experience
-- Updating SUPPORT.MD with content about this project's support experience
-- Understanding the security reporting process in SECURITY.MD
-- Remove this section from the README
+To use code import module 
+`import-module .\Microsoft.Services.WorkflowAssessment.Root.dll -verbose`
+
+Run to get workflows using the sites.csv using CSOM code permissons needed is a farm admin, and can be done from any PC that has connection to SharePoint web server  
+`Get-WorkflowAssociationsForOnprem -SiteCollectionURLFilePath .\sites.csv  -DomainName contoso -AssessmentOutputFolder .\Output`
 
 ## Contributing
 
