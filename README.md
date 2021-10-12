@@ -16,6 +16,15 @@ To use code import module
 Run to get workflows using the sites.csv using CSOM code. Permissions needed is at least site collection admin for each of the site in the sites.csv, and can be done from any PC that has connection to SharePoint web server  
 `Get-WorkflowAssociationsForOnprem -SiteCollectionURLFilePath .\sites.csv  -DomainName contoso -AssessmentOutputFolder .\Output`
 
+Output
+Folders Review
+This utility produces 4 folders, but only Logs and Summary have contents from this utility.
+
+* Logs – contains the process logs for the utility and any errors.
+* Summary – contains the WorkflowDiscovery.csv that has workflow information for all the site collections that were supplied in the sites.csv file.
+
+![Folder_Structure](https://user-images.githubusercontent.com/63272213/137014648-a9ce8eb4-6e00-4bdd-aa39-2dde31a412a0.png)
+
 ## Contributing
 
 This project welcomes contributions and suggestions.  Most contributions require you to agree to a
