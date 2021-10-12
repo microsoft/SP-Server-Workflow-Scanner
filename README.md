@@ -13,7 +13,7 @@ To Start - Clone Project locally. This project has been verified to work in Visu
 To use code import module 
 `import-module .\Microsoft.Services.WorkflowAssessment.Root.dll -verbose`
 
-Run to get workflows using the sites.csv using CSOM code permissons needed is a farm admin, and can be done from any PC that has connection to SharePoint web server  
+Run to get workflows using the sites.csv using CSOM code. Permissions needed is at least site collection admin for each of the site in the sites.csv, and can be done from any PC that has connection to SharePoint web server  
 `Get-WorkflowAssociationsForOnprem -SiteCollectionURLFilePath .\sites.csv  -DomainName contoso -AssessmentOutputFolder .\Output`
 
 ## Contributing
