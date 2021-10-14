@@ -49,4 +49,4 @@ Any use of third-party trademarks or logos are subject to those third-party's po
 
 ## Origins
 
-This base code was developed by the Modern Work Team from the Industry Solutions Deliver group. https://www.microsoft.com/en-us/msservices/modern-work
+This base code was developed by the Modern Work Team from the Industry Solutions Delivery group. https://www.microsoft.com/en-us/msservices/modern-work
